@@ -33,19 +33,22 @@ class Board(object):
 
     
     def move(self, start, end):
+        print(f"Move: {self.turns}, Turn: {self.turn}")
         self.get_square(end)
         move_vector = self.get_move_vector(start, end)
         piece = self.find_piece(start)
         piece.move(self, end, move_vector)
         self.old_board = self.board
+        print('\n'.join((''.join(str(x)) for x in self.board)))
 
         if self.turn == "W":
             self.turn = "B"
-            print(f"It is now turn for {self.turn}")
         else:
             self.turns += 1
             self.turn = "W"
-            print(f"End of move:{self.turns}. It is now turn for {self.turn}")
+        print()
+        print('='*79)
+        print()
 
     def square_to_coords(self, square):
         col, row = list(square)
@@ -67,7 +70,7 @@ class Board(object):
         
         return piece
     
-    def move_collision(self, move_vector, start):
+    def move_collision(self, move_vector, piece):
         def get_sign(x):
             if x > 0 :
                 return 1
@@ -75,13 +78,14 @@ class Board(object):
                 return -1
             else:
                 return 0
-
-        if isinstance(self, (type(Pawn()), type(King()), type(Horse()))):
-            return False
+        start = piece.loc
         
+        start_coord = self.square_to_coords(start)
         multiplier = abs(max(*move_vector))
         unit = tuple(map(get_sign, move_vector))
-        start_coord = self.square_to_coords(start)
+
+        if isinstance(piece, (type(King()), type(Horse()), type(Pawn()))):
+            return False
 
         for i in range(1, multiplier):
             row = i * unit[0] + start_coord[0]
@@ -112,13 +116,16 @@ class Piece(object):
             raise ChessOopsie.MoveError(f"{self} cannot move that far")
         if isinstance(self, type(Pawn())) and ((move_vector[0] > 0 and self.colour == 'W') or (move_vector[0] < 0 and self.colour == 'B')):
             raise ChessOopsie.MoveError("Pawns can only move forward") 
-        if isinstance(self, type(Pawn())) and (abs(move_vector[0]) > 1) and (self.moves > 0):
+        if isinstance(self, type(Pawn())) and (abs(move_vector[0]) > 1) and (self.loc[1] != ("2" if self.colour == "W" else "7")):
             raise ChessOopsie.MoveError("Pawns can only double move at the beginning")
         if isinstance(self, type(Pawn())) and (abs(move_vector[1]) > 0) and isinstance(board.get_square(end), type(Space())):
             raise ChessOopsie.MoveError("Pawns cannot move diagonaly into an empty space")
-        if board.move_collision(move_vector, self.loc):
+        if isinstance(self, type(Pawn())) and (abs(move_vector[1]) == 0) and not isinstance(board.get_square(end), type(Space())):
+            raise ChessOopsie.MoveError("Pawns cannot attck forward")
+        #if isinstance(self, type(King())) and(abs(move_vector[1] > 1) and (self.loc[0] in [1, 8])
+        if board.move_collision(move_vector, self):
             raise ChessOopsie.MoveError("Only Horses can jump over other pieces")
-
+        #TODO: check and pawn
     
     def move(self, board, end, move_vector):
         self.check_move_is_legal(move_vector, board, end)
@@ -186,16 +193,17 @@ class Queen(Piece):
 
 class King(Piece):
     symbol = 'K'
-    move_vectors = [(1, 1), (1, 0), (1, -1), (0, 1), (0, -1), (-1, 1), (-1, 0), (-1, -1)]
+    move_vectors = [(1, 1), (1, 0), (1, -1), (0, 1), (0, -1), (-1, 1), (-1, 0), (-1, -1),
+                    (0, 2), (0, -2)]
 
 
 
 def main():
     board = Board()
     board.move("e2", "e4")
-    board.move("d7", "d5")
-    board.move("e4", "d5")
-    print(board)
+    board.move("e7", "e5")
+    board.move("e4", "e5")
+    
 
 if __name__ == '__main__':
     main()
