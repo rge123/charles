@@ -52,7 +52,7 @@ class Board(object):
         
         return piece
 
-
+null
 
 class Piece(object):
     def __init__(self, colour=None, loc=None):
