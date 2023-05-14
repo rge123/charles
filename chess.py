@@ -95,10 +95,29 @@ class Board(object):
 
         return False
     
+    def find_king(self, colour):
+        for row in self.board:
+            for piece in row:
+                if type(piece) == type(King()) and piece.colour == colour:
+                    return piece
+        raise ValueError("No King on board!")
+
     def is_check(self):
-        return False
+        king = self.find_king(self.turn)
+        coords = self.square_to_coords(king.loc)
+        if self.turn == "W":
+            pawn1_y = coords[0] - 1
+            pawn1_x = coords[1] - 1
+            pawn2_x = coords[1] + 1
+            
+            pawn_condition = type(self.board[pawn1_x][pawn1_y]) == type(Pawn()) or type(self.board[pawn2_x][pawn1_y]) == type(Pawn())
 
 
+            try:
+                if any(pawn_condition,):
+                    return True
+            except IndexError:
+                pass 
 class Piece(object):
     def __init__(self, colour=None, loc=None):
         self.colour = colour
@@ -122,10 +141,22 @@ class Piece(object):
             raise ChessOopsie.MoveError("Pawns cannot move diagonaly into an empty space")
         if isinstance(self, type(Pawn())) and (abs(move_vector[1]) == 0) and not isinstance(board.get_square(end), type(Space())):
             raise ChessOopsie.MoveError("Pawns cannot attck forward")
-        #if isinstance(self, type(King())) and(abs(move_vector[1] > 1) and (self.loc[0] in [1, 8])
+        if isinstance(self, type(King())) and abs(move_vector[1] > 1) and ((self.loc != ("e1" if self.colour == "W" else "e8")) or (type(board.get_square("h1" if self.colour == "W" else "h8")) != type(Rook()))):
+            raise ChessOopsie.MoveError("Can only short castle if king and rook are in start positions")
         if board.move_collision(move_vector, self):
             raise ChessOopsie.MoveError("Only Horses can jump over other pieces")
-        #TODO: check and pawn
+        #TODO: check
+
+    def castle(self, board):
+        if self.colour == "W":
+            board.board[7][5] = board.get_square("h1")
+            board.board[7][7] = Space(" ", "h1")
+        else:
+            board.board[0][5] = board.get_square("h8")
+            board.board[0][7] = Space(" ", "h8")
+        print("Short castle")
+            
+
     
     def move(self, board, end, move_vector):
         self.check_move_is_legal(move_vector, board, end)
@@ -137,7 +168,9 @@ class Piece(object):
         end_coord = board.square_to_coords(end)
         board.board[start_coord[0]][start_coord[1]] = Space(" ", end)
         board.board[end_coord[0]][end_coord[1]] = self
-        
+
+        if self.symbol == "K" and abs(move_vector[1]) > 1:
+            self.castle(board)
 
         if board.is_check():
             self.board = self.old_board
@@ -194,7 +227,7 @@ class Queen(Piece):
 class King(Piece):
     symbol = 'K'
     move_vectors = [(1, 1), (1, 0), (1, -1), (0, 1), (0, -1), (-1, 1), (-1, 0), (-1, -1),
-                    (0, 2), (0, -2)]
+                    (0, 2)] #TODO add long castle
 
 
 
@@ -202,7 +235,18 @@ def main():
     board = Board()
     board.move("e2", "e4")
     board.move("e7", "e5")
-    board.move("e4", "e5")
+    board.move("f1", "c4")
+    board.move("d8", "h4")
+    board.move("d2", "d3")
+    board.move("f8", "b4")
+    board.move("b1", "c3")
+    board.move("b8", "a6")
+    board.move("g1", "f3")
+    board.move("b4", "c3")
+    board.move("b2", "c3")
+    board.move("a6", "c5")
+    board.move("e1", "g1")
+    board.move("h4", "e7")
     
 
 if __name__ == '__main__':
