@@ -1,6 +1,10 @@
-
-class FindPieceError(Exception):
+class ChessOopsie(Exception):
     pass
 
-class MoveError(Exception):
+
+class FindPieceError(ChessOopsie):
     pass
+
+class MoveError(ChessOopsie):
+    pass
+

@@ -1,5 +1,5 @@
 import copy
-import ChessOopsie
+from ChessOopsie import *
 
 
 class Board(object):
@@ -32,23 +32,22 @@ class Board(object):
     
 
     
-    def move(self, start, end):
-        print(f"Move: {self.turns}, Turn: {self.turn}")
+    def move(self, start, end, check=True):
         self.get_square(end)
         move_vector = self.get_move_vector(start, end)
-        piece = self.find_piece(start)
-        piece.move(self, end, move_vector)
+        piece = self.find_piece(start, check)
+        piece.move(self, end, move_vector, check=check)
         self.old_board = self.board
-        print('\n'.join((''.join(str(x)) for x in self.board)))
+        #print('\n'.join((''.join(str(x)) for x in self.board)))
 
         if self.turn == "W":
             self.turn = "B"
         else:
             self.turns += 1
             self.turn = "W"
-        print()
-        print('='*79)
-        print()
+        # print()
+        # print('='*79)
+        # print()
 
     def square_to_coords(self, square):
         col, row = list(square)
@@ -59,20 +58,20 @@ class Board(object):
         try:
             return self.board[row][col]
         except IndexError:
-            raise ChessOopsie.FindPieceError("That square is not on the board!")
+            raise FindPieceError("That square is not on the board!")
 
-    def find_piece(self, start):
+    def find_piece(self, start, check):
         piece = self.get_square(start)
         if isinstance(piece, type(Space())):
-            raise ChessOopsie.FindPieceError(f"The square {start} has no piece on it")
-        if piece.colour != self.turn:
-            raise ChessOopsie.FindPieceError(f"The {piece} piece is not the same colour as the current turn: {self.turn}")
+            raise FindPieceError(f"The square {start} has no piece on it")
+        if check and piece.colour != self.turn:
+            raise FindPieceError(f"The {piece} piece is not the same colour as the current turn: {self.turn}")
         
         return piece
     
     def move_collision(self, move_vector, piece):
         def get_sign(x):
-            if x > 0 :
+            if x > 0:
                 return 1
             elif x < 0:
                 return -1
@@ -81,12 +80,12 @@ class Board(object):
         start = piece.loc
         
         start_coord = self.square_to_coords(start)
-        multiplier = abs(max(*move_vector))
+        multiplier = abs(max(*move_vector, key=abs))
         unit = tuple(map(get_sign, move_vector))
 
         if isinstance(piece, (type(King()), type(Horse()), type(Pawn()))):
             return False
-
+        
         for i in range(1, multiplier):
             row = i * unit[0] + start_coord[0]
             col = i * unit[1] + start_coord[1]
@@ -95,29 +94,27 @@ class Board(object):
 
         return False
     
-    def find_king(self, colour):
+    def find_king(self):
         for row in self.board:
             for piece in row:
-                if type(piece) == type(King()) and piece.colour == colour:
+                if type(piece) == type(King()) and piece.colour == self.turn:
                     return piece
         raise ValueError("No King on board!")
 
     def is_check(self):
-        king = self.find_king(self.turn)
-        coords = self.square_to_coords(king.loc)
-        if self.turn == "W":
-            pawn1_y = coords[0] - 1
-            pawn1_x = coords[1] - 1
-            pawn2_x = coords[1] + 1
-            
-            pawn_condition = type(self.board[pawn1_x][pawn1_y]) == type(Pawn()) or type(self.board[pawn2_x][pawn1_y]) == type(Pawn())
+        king = self.find_king()
+        for row in self.board:
+            for piece in row:
+                if piece.colour != self.turn:
+                    try:
+                        self.move(piece.loc, king.loc, check=False)
+                        return True
+                    except ChessOopsie as e:
+                        pass
+        return False
 
+    
 
-            try:
-                if any(pawn_condition,):
-                    return True
-            except IndexError:
-                pass 
 class Piece(object):
     def __init__(self, colour=None, loc=None):
         self.colour = colour
@@ -132,20 +129,21 @@ class Piece(object):
     
     def check_move_is_legal(self, move_vector, board, end):
         if move_vector not in self.move_vectors:
-            raise ChessOopsie.MoveError(f"{self} cannot move that far")
+            raise MoveError(f"{self} cannot move that far")
         if isinstance(self, type(Pawn())) and ((move_vector[0] > 0 and self.colour == 'W') or (move_vector[0] < 0 and self.colour == 'B')):
-            raise ChessOopsie.MoveError("Pawns can only move forward") 
+            raise MoveError("Pawns can only move forward") 
         if isinstance(self, type(Pawn())) and (abs(move_vector[0]) > 1) and (self.loc[1] != ("2" if self.colour == "W" else "7")):
-            raise ChessOopsie.MoveError("Pawns can only double move at the beginning")
+            raise MoveError("Pawns can only double move at the beginning")
         if isinstance(self, type(Pawn())) and (abs(move_vector[1]) > 0) and isinstance(board.get_square(end), type(Space())):
-            raise ChessOopsie.MoveError("Pawns cannot move diagonaly into an empty space")
+            raise MoveError("Pawns cannot move diagonaly into an empty space")
         if isinstance(self, type(Pawn())) and (abs(move_vector[1]) == 0) and not isinstance(board.get_square(end), type(Space())):
-            raise ChessOopsie.MoveError("Pawns cannot attck forward")
+            raise MoveError("Pawns cannot attck forward")
         if isinstance(self, type(King())) and abs(move_vector[1] > 1) and ((self.loc != ("e1" if self.colour == "W" else "e8")) or (type(board.get_square("h1" if self.colour == "W" else "h8")) != type(Rook()))):
-            raise ChessOopsie.MoveError("Can only short castle if king and rook are in start positions")
+            raise MoveError("Can only short castle if king and rook are in start positions")
+        if board.get_square(end).colour == self.colour:
+            raise MoveError("Cannot capture own piece")
         if board.move_collision(move_vector, self):
-            raise ChessOopsie.MoveError("Only Horses can jump over other pieces")
-        #TODO: check
+            raise MoveError("Only Horses can jump over other pieces")
 
     def castle(self, board):
         if self.colour == "W":
@@ -154,11 +152,11 @@ class Piece(object):
         else:
             board.board[0][5] = board.get_square("h8")
             board.board[0][7] = Space(" ", "h8")
-        print("Short castle")
+        #print("Short castle")
             
 
     
-    def move(self, board, end, move_vector):
+    def move(self, board, end, move_vector, check):
         self.check_move_is_legal(move_vector, board, end)
         start_coord = board.square_to_coords(self.loc)
         end_piece = board.get_square(end)
@@ -172,15 +170,16 @@ class Piece(object):
         if self.symbol == "K" and abs(move_vector[1]) > 1:
             self.castle(board)
 
-        if board.is_check():
-            self.board = self.old_board
-            self.moves -= 1
-            self.loc = old_loc
-            raise ChessOopsie.MoveError("You cannot move a piece that results in self check")
+        if check:
+            if board.is_check():
+                board.board = board.old_board
+                self.moves -= 1
+                self.loc = old_loc
+                raise MoveError("You cannot move a piece that results in self check")
 
         if not isinstance(end_piece, type(Space())):
             board.captured_pieces.append(end_piece)
-            print(f"{board.turn} captured {end_piece} on {end}")
+            #print(f"{board.turn} captured {end_piece} on {end}")
 
 class Space(Piece):
     symbol = ' '
@@ -230,23 +229,57 @@ class King(Piece):
                     (0, 2)] #TODO add long castle
 
 
+class Charles(object):
+    def __init__(self, depth=2):
+        self.depth = depth
+
+    def get_pieces(self, board, turn):
+        pieces = []
+        for row in board.board:
+            for piece in row:
+                if piece.colour == turn:
+                    pieces.append(piece)
+        return pieces
+
+
+    def get_end_move_squares(self, board, piece):
+        moves = []
+        move_vectors = piece.move_vectors
+        for move_vector in move_vectors:
+            try:
+                coord = board.square_to_coords(piece.loc)
+                moves.append(board.board[coord[0] + move_vector[0]][coord[1] + move_vector[1]].loc)
+            except Exception as e:
+                pass
+        return moves
+
+    
+    def evaluate(self, board, turn):
+        pieces = self.get_pieces(board, turn)
+        allowed_moves = []
+        for piece in pieces:
+            moves = self.get_end_move_squares(board, piece)
+            for move in moves:
+                try:
+                    loc = piece.loc
+                    test_board = copy.deepcopy(board)
+                    test_board.move(loc, move)
+                    allowed_moves.append((loc, move))
+                except ChessOopsie as e:
+                    pass
+
+
+
+
+
+
 
 def main():
+    charles = Charles()
     board = Board()
-    board.move("e2", "e4")
-    board.move("e7", "e5")
-    board.move("f1", "c4")
-    board.move("d8", "h4")
-    board.move("d2", "d3")
-    board.move("f8", "b4")
-    board.move("b1", "c3")
-    board.move("b8", "a6")
-    board.move("g1", "f3")
-    board.move("b4", "c3")
-    board.move("b2", "c3")
-    board.move("a6", "c5")
-    board.move("e1", "g1")
-    board.move("h4", "e7")
+
+    charles.evaluate(board, "W")
+
     
 
 if __name__ == '__main__':
